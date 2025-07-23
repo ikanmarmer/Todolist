@@ -8,12 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
+        // Validasi input
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -24,27 +26,44 @@ class AuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $freePlan = Plan::where('name', $request->name)->first();
-        if (!$freePlan) {
-            return response()->json(['error' => 'Default plan not found'], 500);
+        try {
+            // CARI PLAN BERDASARKAN NAMA PLAN, BUKAN NAMA USER
+            $freePlan = Plan::where('name', 'Free')->first();
+
+            if (!$freePlan) {
+                Log::error('Free plan not found in database');
+                return response()->json(['error' => 'Free plan not found'], 500);
+            }
+
+            $user = User::create([
+                'name' => $request->input('name'),
+                'email' => $request->input('email'),
+                'password' => bcrypt($request->input('password')),
+                'plan_id' => $freePlan->id,
+            ]);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'User registered successfully',
+                'user' => $user,
+                'token' => $token,
+            ], 201);
+
+        } catch (\Exception $e) {
+            // LOG ERROR UNTUK DEBUGGING
+            Log::error('Registration error: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'error' => 'Server error',
+                'message' => $e->getMessage()
+            ], 500);
         }
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-            'plan_id' => $freePlan->id,
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-            'token' => $token,
-        ], 201);
-        // Registration logic here
     }
-    public function login(Request $request){
+
+    public function login(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'email' => 'required|string|email',
             'password' => 'required|string',
@@ -53,70 +72,111 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-        $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json([
-            'message' => 'User logged in successfully',
-            'user' => $user,
-            'token' => $token,
-        ], 200);
 
+        try {
+            if (!Auth::attempt($request->only('email', 'password'))) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+
+            $user = Auth::user();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'User logged in successfully',
+                'user' => $user,
+                'token' => $token,
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Login error: ' . $e->getMessage());
+            return response()->json(['error' => 'Server error'], 500);
+        }
     }
 
-    public function me(){
-        return response()->json(Auth::user());
+    public function me()
+    {
+        try {
+            return response()->json(Auth::user());
+        } catch (\Exception $e) {
+            Log::error('Me error: ' . $e->getMessage());
+            return response()->json(['error' => 'Server error'], 500);
+        }
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'User logged out successfully'], 200);
+        try {
+            $request->user()->currentAccessToken()->delete();
+            return response()->json(['message' => 'User logged out successfully'], 200);
+        } catch (\Exception $e) {
+            Log::error('Logout error: ' . $e->getMessage());
+            return response()->json(['error' => 'Server error'], 500);
+        }
     }
 
-    public function oAuthUrl(){
-        $url = Socialite::driver('google')->stateless()->redirect()->getTargetUrl();
-        return response()->json(['url' => $url]);
+    public function oAuthUrl()
+    {
+        try {
+            $url = Socialite::driver('google')->stateless()->redirect()->getTargetUrl();
+            return response()->json(['url' => $url]);
+        } catch (\Exception $e) {
+            Log::error('OAuth URL error: ' . $e->getMessage());
+            return response()->json(['error' => 'Server error'], 500);
+        }
     }
 
-    public function oAuthCallBack(){
-        $user = Socialite::driver('google')->stateless()->user();
-        $existingUser = User::where('email', $user->getEmail())->first();
-        if ($existingUser) {
-            $token = $existingUser->createToken('auth_token')->plainTextToken;
-            if ($existingUser){
-                $token = $existingUser->createToken('auth_token')->plainTextToken;
+    public function oAuthCallBack(Request $request) // TAMBAHKAN PARAMETER REQUEST
+    {
+        try {
+            $socialUser = Socialite::driver('google')->stateless()->user();
+
+            $existingUser = User::where('email', $socialUser->getEmail())->first();
+
+            if ($existingUser) {
+                // Update avatar jika perlu
                 $existingUser->update([
-                    'avatar' => $user ->avatar ?? $user->getAvatar(),
+                    'avatar' => $socialUser->avatar ?? $socialUser->getAvatar(),
                 ]);
+
+                $token = $existingUser->createToken('auth_token')->plainTextToken;
+
                 return response()->json([
                     'message' => 'User logged in successfully',
                     'user' => $existingUser,
                     'token' => $token,
-                ],);
-            } else {
-                $freePlan = Plan::where('name', 'Free')->first();
-                if (!$freePlan) {
-                    return response()->json(['error' => 'Default plan not found'], 500);
-                }
-                $newUser = User::create([
-                    'name' => $user->getName(),
-                    'email' => $user->getEmail(),
-                    'password' => null,
-                    'plan_id' => $freePlan->id,
-                    'avatar' => $user->avatar ?? $user->getAvatar(),
-                ]);
-                $token = $newUser->createToken('auth_token')->plainTextToken;
-                return response()->json([
-                    'message' => 'User logged in successfully',
-                    'user' => $newUser,
-                    'token' => $token,
-                ], 201);
+                ], 200);
             }
-    }
-    }
 
+            // Buat user baru jika belum ada
+            $freePlan = Plan::where('name', 'Free')->first();
 
+            if (!$freePlan) {
+                Log::error('Free plan not found during OAuth registration');
+                return response()->json(['error' => 'Default plan not found'], 500);
+            }
+
+            $newUser = User::create([
+                'name' => $socialUser->getName(),
+                'email' => $socialUser->getEmail(),
+                'password' => null,
+                'plan_id' => $freePlan->id,
+                'avatar' => $socialUser->avatar ?? $socialUser->getAvatar(),
+            ]);
+
+            $token = $newUser->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'message' => 'User registered successfully',
+                'user' => $newUser,
+                'token' => $token,
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('OAuth callback error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Authentication failed',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
