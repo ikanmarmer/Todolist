@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Plan;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class PlanSeeder extends Seeder
 {
@@ -13,6 +14,13 @@ class PlanSeeder extends Seeder
      */
     public function run(): void
     {
+        DB::table('plans')->insert([
+    'name' => 'Free',
+    'price' => 0, // Or whatever value makes sense
+    'created_at' => now(),
+    'updated_at' => now()
+]);
+
         // Plan::create([
         //     'name' => 'Free',
         //     'description' => 'Free plan with basic features',
@@ -33,5 +41,16 @@ class PlanSeeder extends Seeder
         //     'price' => 19.99,
         //     'task_limit' => 100,
         // ]);
+
+        // Plan::updateOrCreate(
+        //     ['name' => 'Free plan'],
+        //     [
+        //         'description' => 'Akses dasar tanpa biaya',
+        //         'price'       => 0.00,
+        //         'tasks_limit' => 5,
+        //     ]
+        // );
+
+        // $this->command->info('✅ Free plan berhasil di-seed.');
     }
 }
