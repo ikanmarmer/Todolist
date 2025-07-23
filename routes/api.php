@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\SubTaskController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PlanController;
+use App\Http\Controllers\UserController;
 
 Route::prefix('V1')->group(function () {
     Route::prefix('auth')->group(function () {
@@ -20,6 +21,7 @@ Route::prefix('V1')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
         });
     });
+    Route::get('/user/me', [UserController::class, 'me']);
     Route::get('plans', [PlanController::class, 'index']);
     Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
