@@ -75,7 +75,7 @@
 
     <div class="footer">
         <p>Terima kasih telah bertransaksi dengan kami.</p>
-        <p>Invoice ini dibuat secara otomatis dan tidak memerlukan tanda tangan.</p>
+        <p>Invoice ini dibuat secara otomatis.</p>
     </div>
 </body>
 </html>
