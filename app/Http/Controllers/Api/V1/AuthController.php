@@ -8,9 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+
 
 class AuthController extends Controller
 {
+    use HasApiTokens, Notifiable;
+
     public function oAuthUrl()
     {
         $url = Socialite::driver('google')->stateless()->redirect()->getTargetUrl();
@@ -61,6 +66,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
+
         ]);
 
         if ($validator->fails()) {

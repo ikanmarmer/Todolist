@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\V1\SubTaskController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PlanController;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\V1\UserController;
 
 Route::prefix('V1')->group(function () {
     Route::prefix('auth')->group(function () {
