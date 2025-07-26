@@ -24,6 +24,7 @@ Route::prefix('V1')->group(function () {
     Route::get('/user/me', [UserController::class, 'me']);
     Route::get('plans', [PlanController::class, 'index']);
     Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/user/change-password', [AuthController::class, 'changePassword']);
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('tasks/{id}', [TaskController::class, 'update']);
         Route::apiResource('tasks.subtasks', SubTaskController::class)->only(['index', 'store', 'destroy']);
