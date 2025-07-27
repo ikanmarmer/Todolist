@@ -11,6 +11,7 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 
 class AuthController extends Controller
@@ -154,7 +155,65 @@ class AuthController extends Controller
     $user->save();
 
     return response()->json(['message' => 'Password changed successfully']);
-}
+    }
+
+    public function updateProfile(Request $request)
+{
+    $user = $request->user();
+
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+        'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json($validator->errors(), 422);
+    }
+
+    $data = [
+        'name' => $request->name,
+        'email' => $request->email,
+    ];
+
+    if ($request->hasFile('avatar')) {
+        // Hapus avatar lama jika ada
+        if ($user->avatar) {
+            Storage::delete('public/avatars/' . $user->avatar);
+        }
+
+        // Simpan avatar baru
+        $avatar = $request->file('avatar');
+        $filename = time() . '.' . $avatar->getClientOriginalExtension();
+        $avatar->storeAs('public/avatars', $filename);
+        $data['avatar'] = $filename;
+    }
+
+    $user->update($data);
+
+    return response()->json([
+        'message' => 'Profile updated successfully',
+        'user' => $user
+    ]);
+    }
+
+    public function deleteAvatar(Request $request)
+{
+    $user = $request->user();
+
+    if ($user->avatar) {
+        Storage::delete('public/avatars/' . $user->avatar);
+        $user->avatar = null;
+        $user->save();
+    }
+
+    return response()->json([
+        'message' => 'Avatar deleted successfully',
+        'user' => $user
+    ]);
+    }
+
+
 
 }
 

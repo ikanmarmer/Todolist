@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ContactController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -10,7 +11,10 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PlanController;
 use App\Http\Controllers\Api\V1\UserController;
 
+
+
 Route::prefix('V1')->group(function () {
+    Route::post('/contact', [ContactController ::class,'send']);
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
@@ -21,10 +25,14 @@ Route::prefix('V1')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
         });
     });
-    Route::get('/user/me', [UserController::class, 'me']);
-    Route::get('plans', [PlanController::class, 'index']);
+
+    Route::get('/plans', [PlanController::class, 'index']);
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/user/me', [UserController::class, 'me']);
         Route::post('/user/change-password', [AuthController::class, 'changePassword']);
+        Route::post('/user/update', [UserController::class, 'update']);
+        Route::delete('/user/delete-avatar', [UserController ::class, 'deleteAvatar']);
+        Route::post('/user/change-password', [UserController::class, 'changePassword']);
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('tasks/{id}', [TaskController::class, 'update']);
         Route::apiResource('tasks.subtasks', SubTaskController::class)->only(['index', 'store', 'destroy']);

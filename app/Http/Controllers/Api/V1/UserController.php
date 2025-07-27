@@ -10,7 +10,13 @@ class UserController extends Controller
 {
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+    return response()->json([
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'avatar' => $user->avatar ? Storage::disk('public')->url($user->avatar) : null
+    ]);
     }
 
     public function update(Request $request)
@@ -26,21 +32,36 @@ class UserController extends Controller
         $user->name = $request->name;
         $user->email = $request->email;
 
+        // Di dalam method update()
         if ($request->hasFile('avatar')) {
-            if ($user->avatar && Storage::exists($user->avatar)) {
-                Storage::delete($user->avatar);
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
             }
 
+            // Perbaikan path penyimpanan
             $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = $path;
+            $user->avatar = $path; // Simpan relative path
         }
+        // if ($request->hasFile('avatar')) {
+        //     if ($user->avatar && Storage::exists($user->avatar)) {
+        //         Storage::delete($user->avatar);
+        //     }
+
+        //     $path = $request->file('avatar')->store('avatars', 'public');
+        //     $user->avatar = $path;
+        // }
 
         $user->save();
 
         return response()->json([
-            'message' => 'Profil berhasil diperbarui',
-            'user' => $user
-        ]);
+        'message' => 'Profil berhasil diperbarui',
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $user->avatar ? Storage::disk('public')->url($user->avatar) : null
+        ]
+    ]);
     }
 
     public function deleteAvatar(Request $request)
@@ -54,7 +75,15 @@ class UserController extends Controller
         $user->avatar = null;
         $user->save();
 
-        return response()->json(['message' => 'Avatar berhasil dihapus']);
+        return response()->json([
+        'message' => 'Avatar berhasil dihapus',
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => null
+        ]
+    ]);
     }
 
     public function changePassword(Request $request)
