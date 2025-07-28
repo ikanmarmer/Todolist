@@ -6,26 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->text('description')->nullable();
-            $table->text('video')->nullable();
-            $table->string('image')->nullable();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('video')->nullable();
+            $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
+            $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
+            $table->timestamp('due_date')->nullable();
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
+
+            $table->index(['user_id', 'status']);
+            $table->index('due_date');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('tasks');
     }

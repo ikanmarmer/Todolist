@@ -1,56 +1,78 @@
 <?php
+// database/seeders/PlanSeeder.php
 
 namespace Database\Seeders;
 
-use App\Models\Plan;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\Plan;
 
 class PlanSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
-    public function run(): void
+    public function run()
     {
-        DB::table('plans')->insert([
-    'name' => 'Free',
-    'price' => 0, // Or whatever value makes sense
-    'created_at' => now(),
-    'updated_at' => now()
-]);
+        $plans = [
+            [
+                'name' => 'Free',
+                'description' => 'Cocok untuk pemula yang ingin mencoba fitur dasar',
+                'price' => 0,
+                'tasks_limit' => 5,
+                'color' => '#64748b',
+                'is_popular' => false,
+                'features' => json_encode([
+                    '5 Task per bulan',
+                    'Basic support',
+                    'Todo list sederhana'
+                ])
+            ],
+            [
+                'name' => 'Basic',
+                'description' => 'Ideal untuk penggunaan personal dengan kebutuhan menengah',
+                'price' => 29000,
+                'tasks_limit' => 50,
+                'color' => '#06b6d4',
+                'is_popular' => false,
+                'features' => json_encode([
+                    '50 Task per bulan',
+                    'Email support',
+                    'Advanced todo features',
+                    'Export data'
+                ])
+            ],
+            [
+                'name' => 'Pro',
+                'description' => 'Terbaik untuk profesional dan tim kecil',
+                'price' => 79000,
+                'tasks_limit' => 200,
+                'color' => '#8b5cf6',
+                'is_popular' => true,
+                'features' => json_encode([
+                    '200 Task per bulan',
+                    'Priority support',
+                    'Team collaboration',
+                    'Advanced analytics',
+                    'Custom categories'
+                ])
+            ],
+            [
+                'name' => 'Enterprise',
+                'description' => 'Solusi lengkap untuk bisnis dan organisasi besar',
+                'price' => 199000,
+                'tasks_limit' => 1000,
+                'color' => '#f59e0b',
+                'is_popular' => false,
+                'features' => json_encode([
+                    '1000 Task per bulan',
+                    '24/7 Premium support',
+                    'Advanced team management',
+                    'Custom integrations',
+                    'White-label solution',
+                    'API access'
+                ])
+            ]
+        ];
 
-        // Plan::create([
-        //     'name' => 'Free',
-        //     'description' => 'Free plan with basic features',
-        //     'price' => 0,
-        //     'task_limit' => 1,
-        // ]);
-
-        // Plan::create([
-        //     'name' => 'Pro',
-        //     'description' => 'Pro plan with advanced features',
-        //     'price' => 9.99,
-        //     'task_limit' => 10,
-        // ]);
-
-        // Plan::create([
-        //     'name' => 'Company',
-        //     'description' => 'Premium plan with all features',
-        //     'price' => 19.99,
-        //     'task_limit' => 100,
-        // ]);
-
-        // Plan::updateOrCreate(
-        //     ['name' => 'Free plan'],
-        //     [
-        //         'description' => 'Akses dasar tanpa biaya',
-        //         'price'       => 0.00,
-        //         'tasks_limit' => 5,
-        //     ]
-        // );
-
-        // $this->command->info('✅ Free plan berhasil di-seed.');
+        foreach ($plans as $plan) {
+            Plan::create($plan);
+        }
     }
 }

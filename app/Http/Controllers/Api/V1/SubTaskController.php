@@ -6,15 +6,25 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Task;
 use App\Models\SubTask;
+use Illuminate\Support\Facades\Log;
 
 class SubTaskController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index($taskId)
     {
+        try {
+        $subtasks = SubTask::where('task_id', $taskId)->get();
+        return response()->json($subtasks);
+    } catch (\Exception $e) {
+        Log::error("Error fetching subtasks: " . $e->getMessage());
+        return response()->json(['error' => 'Server error'], 500);
+    }
+
         $id = request()->route('task_id');
 
         if (!$id) {
@@ -25,13 +35,14 @@ class SubTaskController extends Controller
         if (Auth::id() !== $task->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
+
         return response()->json($task->subtasks()->get());
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Task $task, Request $request)
     {
         $id = request()->route('task_id');
 
@@ -53,10 +64,12 @@ class SubTaskController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $subtask = $task->subtasks()->create([
-            'title' => $request->title,
-            'description' => $request->description,
-        ]);
+        $data = $request->validate([
+        'title' => 'required|string|max:255',
+        'description' => 'nullable|string',
+    ]);
+
+        $subtask = $task->subtasks()->create($data);
 
         return response()->json($subtask, 201);
     }

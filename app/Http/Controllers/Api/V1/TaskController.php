@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use app\Models\User;
+use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
-use illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Auth;
 
 class TaskController extends Controller
 {
@@ -17,8 +17,22 @@ class TaskController extends Controller
     public function index()
     {
         $user = Auth::user();
-
         $tasks = $user->tasks()->get();
+
+        // Transform the tasks to include proper image URLs
+        $tasks = $tasks->map(function ($task) {
+            return [
+                'id' => $task->id,
+                'title' => $task->title,
+                'description' => $task->description,
+                'video' => $task->video,
+                'image' => $task->image ? asset('storage/' . $task->image) : null,
+                'deadline' => $task->deadline,
+                'created_at' => $task->created_at,
+                'updated_at' => $task->updated_at,
+            ];
+        });
+
         return response()->json($tasks);
     }
 
@@ -49,18 +63,27 @@ class TaskController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'video' => $request->video ?? null,
+            'deadline' => $request->deadline ?? null, // Tambahkan ini
+
         ]);
 
-        $image = $request->file('image');
-        if ($image) {
-            $imagePath = $user->email . '/tasks/' . $task->title;
-            Storage::disk('public')->put($imagePath, $image->getContent());
-            $task->image = $imagePath;
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $imagePath = $user->email . '/tasks/' . $imageName;
+
+            // Store the file
+            $image->storeAs('public/' . $user->email . '/tasks', $imageName);
+
+            // Save the path without 'public/' prefix
+            $task->image = $user->email . '/tasks/' . $imageName;
             $task->save();
         }
 
-        $data = $task;
-        $data['image'] = $task->image == null ? null : asset($task->image);
+        // Return task with proper image URL
+        $data = $task->toArray();
+        $data['image'] = $task->image ? asset('storage/' . $task->image) : null;
 
         return response()->json($data, 201);
     }
@@ -72,12 +95,18 @@ class TaskController extends Controller
     {
         $user = Auth::user();
         $task = $user->tasks()->findOrFail($id);
+
         if (Auth::id() !== $task->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $task->load('subtasks');
-        return response()->json($task);
+
+        // Transform the task to include proper image URL
+        $taskData = $task->toArray();
+        $taskData['image'] = $task->image ? asset('storage/' . $task->image) : null;
+
+        return response()->json($taskData);
     }
 
     /**
@@ -87,6 +116,7 @@ class TaskController extends Controller
     {
         $user = Auth::user();
         $task = $user->tasks()->findOrFail($id);
+
         if (Auth::id() !== $task->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -102,18 +132,34 @@ class TaskController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $task->update($request->only('title', 'description', 'video'));
-        $image = $request->file('image');
-        if ($image) {
-            $imagePath = $user->email . '/tasks/' . $task->title;
-            Storage::disk('public')->put($imagePath, $image->getContent());
-            $imagePath =  Storage::url($imagePath);
-            $task->image = $imagePath;
+        // Update basic fields
+        $task->update([
+            'title' => $request->title,
+            'description' => $request->description,
+            'video' => $request->video ?? null,
+            'deadline' => $request->deadline ?? null,
+        ]);
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($task->image && Storage::disk('public')->exists($task->image)) {
+                Storage::disk('public')->delete($task->image);
+            }
+
+            $image = $request->file('image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $imagePath = $user->email . '/tasks/' . $imageName;
+
+            // Store the new file
+            $image->storeAs('public/' . $user->email . '/tasks', $imageName);
+
+            // Update the image path
+            $task->image = $user->email . '/tasks/' . $imageName;
             $task->save();
         }
 
-        $data = $task;
-        $data['image'] = $task->image == null ? null : asset($task->image);
+        // Return task with proper image URL
+        $data = $task->toArray();
+        $data['image'] = $task->image ? asset('storage/' . $task->image) : null;
 
         return response()->json($data);
     }
@@ -125,9 +171,16 @@ class TaskController extends Controller
     {
         $user = Auth::user();
         $task = $user->tasks()->findOrFail($id);
+
         if (Auth::id() !== $task->user_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
+
+        // Delete associated image if exists
+        if ($task->image && Storage::disk('public')->exists($task->image)) {
+            Storage::disk('public')->delete($task->image);
+        }
+
         $task->delete();
         return response()->json(['message' => 'Task deleted successfully']);
     }

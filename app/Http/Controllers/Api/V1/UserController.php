@@ -10,13 +10,8 @@ class UserController extends Controller
 {
     public function me(Request $request)
     {
-        $user = $request->user();
-    return response()->json([
-        'id' => $user->id,
-        'name' => $user->name,
-        'email' => $user->email,
-        'avatar' => $user->avatar ? Storage::disk('public')->url($user->avatar) : null
-    ]);
+        $user = $request->user()->load('plan');
+        return response()->json($this->formatUserResponse($user));
     }
 
     public function update(Request $request)
@@ -32,58 +27,45 @@ class UserController extends Controller
         $user->name = $request->name;
         $user->email = $request->email;
 
-        // Di dalam method update()
         if ($request->hasFile('avatar')) {
-            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
-                Storage::disk('public')->delete($user->avatar);
+            // Delete old avatar if it's a local file (not Google avatar)
+            if ($user->avatar && !filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+                if (Storage::disk('public')->exists($user->avatar)) {
+                    Storage::disk('public')->delete($user->avatar);
+                }
             }
 
-            // Perbaikan path penyimpanan
+            // Store new avatar
             $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = $path; // Simpan relative path
+            $user->avatar = $path;
         }
-        // if ($request->hasFile('avatar')) {
-        //     if ($user->avatar && Storage::exists($user->avatar)) {
-        //         Storage::delete($user->avatar);
-        //     }
-
-        //     $path = $request->file('avatar')->store('avatars', 'public');
-        //     $user->avatar = $path;
-        // }
 
         $user->save();
 
         return response()->json([
-        'message' => 'Profil berhasil diperbarui',
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'avatar' => $user->avatar ? Storage::disk('public')->url($user->avatar) : null
-        ]
-    ]);
+            'message' => 'Profil berhasil diperbarui',
+            'user' => $this->formatUserResponse($user)
+        ]);
     }
 
     public function deleteAvatar(Request $request)
     {
         $user = $request->user();
 
-        if ($user->avatar && Storage::exists($user->avatar)) {
-            Storage::delete($user->avatar);
+        // Only delete local files, not Google avatars
+        if ($user->avatar && !filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+            if (Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
         }
 
         $user->avatar = null;
         $user->save();
 
         return response()->json([
-        'message' => 'Avatar berhasil dihapus',
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'avatar' => null
-        ]
-    ]);
+            'message' => 'Avatar berhasil dihapus',
+            'user' => $this->formatUserResponse($user)
+        ]);
     }
 
     public function changePassword(Request $request)
@@ -99,5 +81,53 @@ class UserController extends Controller
         ]);
 
         return response()->json(['message' => 'Password berhasil diubah']);
+    }
+
+    // app/Http/Controllers/Api/V1/UserController.php
+    public function profile(Request $request)
+    {
+        $user = $request->user()->load('plan');
+        $tasksCount = $user->tasks()->count();
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'plan' => $user->plan,
+            'tasks_count' => $tasksCount,
+            'tasks_remaining' => $user->remaining_tasks,
+            'task_usage_percentage' => $user->task_usage_percentage,
+            'can_create_task' => $user->canCreateTask(),
+            'plan_expires_at' => $user->plan_expires_at
+        ]);
+    }
+
+    /**
+     * Format user response with proper avatar URL
+     */
+    private function formatUserResponse($user)
+    {
+        $avatarUrl = null;
+
+        if ($user->avatar) {
+            // Check if it's a Google avatar (external URL)
+            if (filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+                $avatarUrl = $user->avatar;
+            } else {
+                // It's a local stored file
+                $avatarUrl = Storage::disk('public')->url($user->avatar);
+            }
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $avatarUrl,
+            'plan_id' => $user->plan_id ?? null,
+            'status' => $user->status ?? 'free',
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+        ];
     }
 }

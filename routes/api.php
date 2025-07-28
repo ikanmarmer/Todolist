@@ -27,6 +27,8 @@ Route::prefix('V1')->group(function () {
     });
 
     Route::get('/plans', [PlanController::class, 'index']);
+    Route::get('/plans/{id}', [PlanController::class, 'show']);
+    Route::post('/payments/callback', [PaymentController::class, 'callback']);
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user/me', [UserController::class, 'me']);
         Route::post('/user/change-password', [AuthController::class, 'changePassword']);
@@ -41,8 +43,51 @@ Route::prefix('V1')->group(function () {
         Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'show', 'destroy']);
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show']);
     });
+
+
+// Protected routes
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // User profile and task info
+    Route::get('/user/profile', function (Request $request) {
+        $user = $request->user()->load('plan');
+        $tasksCount = $user->tasks()->count();
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'plan' => $user->plan,
+            'tasks_count' => $tasksCount,
+            'tasks_remaining' => $user->remaining_tasks,
+            'task_usage_percentage' => $user->task_usage_percentage,
+            'can_create_task' => $user->canCreateTask(),
+            'plan_expires_at' => $user->plan_expires_at
+        ]);
+    });
+
+    Route::get('/user/tasks/count', [PaymentController::class, 'getUserTaskInfo']);
+
+    // Orders
+    Route::apiResource('orders', OrderController::class);
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::get('/user/current-plan', [OrderController::class, 'getCurrentPlanInfo']);
+
+    // Payments
+    Route::apiResource('payments', PaymentController::class);
+    Route::get('/invoice/download/{order_id}', [PaymentController::class, 'downloadInvoice']);
+
+    // Plans management (admin only - add middleware as needed)
+    Route::apiResource('plans', PlanController::class)->except(['index', 'show']);
+});
+
+// Web routes for invoice download (if needed for direct browser access)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/invoice/download/{order_id}', [PaymentController::class, 'downloadInvoice']);
 });
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('plan');
 })->middleware('auth:sanctum');
+
+});

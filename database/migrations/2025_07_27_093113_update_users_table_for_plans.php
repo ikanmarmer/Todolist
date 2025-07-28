@@ -6,23 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('plan_id')->nullable()->constrained('plans')->onDelete('set null')->after('email_verified_at');
+            $table->timestamp('plan_expires_at')->nullable()->after('plan_id');
+            $table->integer('tasks_used')->default(0)->after('plan_expires_at');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::table('users', function (Blueprint $table) {
-            //
+            $table->dropForeign(['plan_id']);
+            $table->dropColumn(['plan_id', 'plan_expires_at', 'tasks_used']);
         });
     }
 };

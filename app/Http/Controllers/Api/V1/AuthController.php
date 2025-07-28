@@ -13,7 +13,6 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
-
 class AuthController extends Controller
 {
     use HasApiTokens, Notifiable;
@@ -27,16 +26,21 @@ class AuthController extends Controller
     public function oAuthCallback(Request $request)
     {
         $user = Socialite::driver('google')->stateless()->user();
-        // dd(['OAuth callback received' => $user]);
+
         $existingUser = User::where('email', $user->getEmail())->first();
         if ($existingUser) {
             $token = $existingUser->createToken('auth_token')->plainTextToken;
-            $existingUser->update([
-                'avatar' => $user->avatar ?? $user->getAvatar()
-            ]);
+
+            // Update avatar from Google if available
+            if ($user->getAvatar()) {
+                $existingUser->update([
+                    'avatar' => $user->getAvatar()
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Login successful',
-                'user' => $existingUser,
+                'user' => $this->formatUserResponse($existingUser),
                 'token' => $token,
             ]);
         } else {
@@ -44,7 +48,7 @@ class AuthController extends Controller
             if (!$freePlan) {
                 return response()->json(['message' => 'Default plan not found.'], 500);
             }
-            // dd($freePlan->id);
+
             $newUser = User::create([
                 'name' => $user->getName(),
                 'email' => $user->getEmail(),
@@ -56,7 +60,7 @@ class AuthController extends Controller
             $token = $newUser->createToken('auth_token')->plainTextToken;
             return response()->json([
                 'message' => 'User created and logged in successfully',
-                'user' => $newUser,
+                'user' => $this->formatUserResponse($newUser),
                 'token' => $token
             ], 201);
         }
@@ -68,14 +72,12 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
-
         ]);
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
-        // Mengambil Plan 'Free' sebagai default saat registrasi
         $freePlan = Plan::where('name', 'Free')->first();
         if (!$freePlan) {
             return response()->json(['message' => 'Default plan not found.'], 500);
@@ -85,26 +87,23 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => bcrypt($request->password),
-            'plan_id' => $freePlan->id, // Assign default plan
+            'plan_id' => $freePlan->id,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
         return response()->json([
             'message' => 'User created successfully',
-            'user' => $user,
+            'user' => $this->formatUserResponse($user),
             'token' => $token
         ], 201);
     }
 
     public function login(Request $request)
     {
-        $validator = Validator::make(
-            $request->all(),
-            [
-                'email' => 'required|string|email',
-                'password' => 'required|string',
-            ]
-        );
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
@@ -118,16 +117,17 @@ class AuthController extends Controller
 
         $user = auth()->user();
         $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json([
             'message' => 'Login successful',
-            'user' => $user,
+            'user' => $this->formatUserResponse($user),
             'token' => $token
         ]);
     }
 
     public function me()
     {
-        return response()->json(auth()->user());
+        return response()->json($this->formatUserResponse(auth()->user()));
     }
 
     public function logout(Request $request)
@@ -137,84 +137,107 @@ class AuthController extends Controller
     }
 
     public function changePassword(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $request->validate([
-        'current_password' => 'required',
-        'new_password' => 'required|min:6|confirmed',
-    ]);
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:6|confirmed',
+        ]);
 
-    // Periksa kecocokan password saat ini
-    if (!Hash::check($request->current_password, $user->password)) {
-        return response()->json(['message' => 'Current password is incorrect'], 422);
-    }
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect'], 422);
+        }
 
-    // Update password baru
-    $user->password = Hash::make($request->new_password);
-    $user->save();
+        $user->password = Hash::make($request->new_password);
+        $user->save();
 
-    return response()->json(['message' => 'Password changed successfully']);
+        return response()->json(['message' => 'Password changed successfully']);
     }
 
     public function updateProfile(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-        'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-    ]);
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json($validator->errors(), 422);
-    }
-
-    $data = [
-        'name' => $request->name,
-        'email' => $request->email,
-    ];
-
-    if ($request->hasFile('avatar')) {
-        // Hapus avatar lama jika ada
-        if ($user->avatar) {
-            Storage::delete('public/avatars/' . $user->avatar);
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
         }
 
-        // Simpan avatar baru
-        $avatar = $request->file('avatar');
-        $filename = time() . '.' . $avatar->getClientOriginalExtension();
-        $avatar->storeAs('public/avatars', $filename);
-        $data['avatar'] = $filename;
-    }
+        $data = [
+            'name' => $request->name,
+            'email' => $request->email,
+        ];
 
-    $user->update($data);
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar && !filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
 
-    return response()->json([
-        'message' => 'Profile updated successfully',
-        'user' => $user
-    ]);
+            // Store new avatar
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = $path;
+        }
+
+        $user->update($data);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $this->formatUserResponse($user)
+        ]);
     }
 
     public function deleteAvatar(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    if ($user->avatar) {
-        Storage::delete('public/avatars/' . $user->avatar);
+        if ($user->avatar && !filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+
         $user->avatar = null;
         $user->save();
+
+        return response()->json([
+            'message' => 'Avatar deleted successfully',
+            'user' => $this->formatUserResponse($user)
+        ]);
     }
 
-    return response()->json([
-        'message' => 'Avatar deleted successfully',
-        'user' => $user
-    ]);
+    /**
+     * Format user response with proper avatar URL
+     */
+    private function formatUserResponse($user)
+    {
+        $avatarUrl = null;
+
+        if ($user->avatar) {
+            // Check if it's a Google avatar (external URL)
+            if (filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+                $avatarUrl = $user->avatar;
+            } else {
+                // It's a local stored file
+                $avatarUrl = Storage::disk('public')->url($user->avatar);
+            }
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $avatarUrl,
+            'plan_id' => $user->plan_id,
+            'status' => $user->status ?? 'free',
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+        ];
     }
-
-
-
 }
 
 // class AuthController extends Controller
