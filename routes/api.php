@@ -37,9 +37,9 @@ Route::prefix('V1')->group(function () {
         Route::post('/user/change-password', [UserController::class, 'changePassword']);
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('tasks/{id}', [TaskController::class, 'update']);
+        Route::post('subtasks/change-status', [SubTaskController::class, 'changeStatus']);
         Route::apiResource('tasks.subtasks', SubTaskController::class)->only(['index', 'store', 'destroy']);
         Route::post('subtasks/{id}', [SubTaskController::class, 'update']);
-        Route::post('subtasks', [SubTaskController::class, 'changeStatus']);
         Route::apiResource('orders', OrderController::class)->only(['index', 'store', 'show', 'destroy']);
         Route::apiResource('payments', PaymentController::class)->only(['index', 'store', 'show']);
     });

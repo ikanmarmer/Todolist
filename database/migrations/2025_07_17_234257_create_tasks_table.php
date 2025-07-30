@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('video')->nullable();
+            $table->string('image')->nullable();
             $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
             $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
             $table->timestamp('due_date')->nullable();

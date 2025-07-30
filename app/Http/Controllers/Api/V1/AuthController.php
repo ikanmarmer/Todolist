@@ -233,6 +233,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'avatar' => $avatarUrl,
             'plan_id' => $user->plan_id,
+            'tasks_limit'  => $user->plan ? $user->plan->tasks_limit : null,
             'status' => $user->status ?? 'free',
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,

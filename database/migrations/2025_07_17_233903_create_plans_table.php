@@ -7,20 +7,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
-    {
-        Schema::create('plans', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description');
-            $table->decimal('price', 10, 2);
-            $table->integer('tasks_limit');
-            $table->string('color')->default('#06b6d4'); // Default cyan color
-            $table->boolean('is_popular')->default(false);
-            $table->json('features')->nullable(); // JSON array of features
-            $table->timestamps();
-        });
-    }
+        public function up()
+        {
+            Schema::create('plans', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->text('description');
+                $table->decimal('price', 10, 2);
+                $table->integer('tasks_limit');
+                $table->string('color')->default('#06b6d4'); // Default cyan color
+                $table->boolean('is_popular')->default(false);
+                $table->json('features')->nullable(); // JSON array of features
+                $table->timestamps();
+            });
+        }
 
     public function down()
     {
